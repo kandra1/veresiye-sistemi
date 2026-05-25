@@ -74,7 +74,19 @@
                 </div>
                 <input type="hidden" id="secilenMusteriId">
                 
-                <input type="text" id="islemAciklama" placeholder="Ne aldı? (Örn: 2 Ekmek, Sigara veya Peşinat)">
+                <select id="islemAciklama">
+                    <option value="" disabled selected>Ürün veya Ödeme Türü Seçin</option>
+                    <option value="iban">İBAN</option>
+                    <option value="euro">EURO</option>
+                    <option value="dolar">DOLAR</option>
+                    <option value="sterlin">STERLİN</option>
+                    <option value="pike">PİKE</option>
+                    <option value="yatak örtüsü">YATAK ÖRTÜSÜ</option>
+                    <option value="kanepe örtüsü">KANAPE ÖRTÜSÜ</option>
+                    <option value="perde">PERDE</option>
+                    <option value="nevresim">NEVRESİM</option>
+                </select>
+                
                 <input type="number" id="islemMiktari" placeholder="Tutar (TL)">
                 
                 <div style="display: flex; gap: 10px;">
@@ -138,7 +150,6 @@
             document.getElementById("btnIslem").className = sekme === 'islem' ? "aktif" : "";
             document.getElementById("btnEkleme").className = sekme === 'ekleme' ? "aktif" : "";
 
-            // Öneri kutularını kapat
             const oneriler = document.getElementById("islemMusteriOnerileri");
             if(oneriler) oneriler.style.display = "none";
             const silOneriler = document.getElementById("silMusteriOnerileri");
@@ -157,7 +168,6 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-        // YENİ: deleteDoc veritabanından silme fonksiyonu eklendi
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, getDoc, query, where, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 
@@ -313,7 +323,6 @@
             onerilerKutusu.style.display = "block";
         }
 
-        // YENİ: Silinecek müşteriyi arama fonksiyonu
         window.silMusteriAra = function() {
             const aranan = document.getElementById("silMusteriArama").value.toLowerCase();
             const onerilerKutusu = document.getElementById("silMusteriOnerileri");
@@ -358,40 +367,32 @@
             } catch (error) { alert("Hata: " + error.message); }
         }
 
-        // YENİ: Müşteriyi Tamamen Silme Fonksiyonu
         window.musteriSil = async function() {
             const id = document.getElementById("secilenSilMusteriId").value;
             const isim = document.getElementById("silMusteriArama").value;
 
             if(!id) return alert("Lütfen silmek istediğiniz müşteriyi listeden aratarak seçin!");
 
-            // Esnaf dostu çift onay mekanizması
             const onay = confirm(`⚠️ DİKKAT: "${isim}" isimli müşteriyi defterden tamamen silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz!`);
-            
             if(!onay) return;
 
             try {
-                // Firestore'dan dokümanı kaldır
                 await deleteDoc(doc(db, "musteriler", id));
-                
-                // Form alanlarını sıfırla
                 document.getElementById("silMusteriArama").value = "";
                 document.getElementById("secilenSilMusteriId").value = "";
-                
                 alert("Müşteri hesabı defterden başarıyla silindi.");
-                sekmeDegistir('arama'); // Ana listeye at
-            } catch (error) { 
-                alert("Silme işlemi sırasında hata oluştu: " + error.message); 
-            }
+                sekmeDegistir('arama');
+            } catch (error) { alert("Silme işlemi sırasında hata oluştu: " + error.message); }
         }
 
         window.islemYap = async function(islemTuru) {
             const musteriId = document.getElementById("secilenMusteriId").value;
             const miktar = parseFloat(document.getElementById("islemMiktari").value);
             const musteriIsim = document.getElementById("musteriAramaIslem").value;
-            const aciklama = document.getElementById("islemAciklama").value.trim(); 
+            const aciklama = document.getElementById("islemAciklama").value; // GÜNCELLENDİ: Seçilen hazır kelimeyi alır
 
             if(!musteriId) return alert("Lütfen listeden aratarak bir müşteri seçin!");
+            if(!aciklama) return alert("Lütfen listeden bir ürün veya ödeme türü seçin!"); // GÜNCELLENDİ: Boş geçilmesini engeller
             if(isNaN(miktar) || miktar <= 0) return alert("Geçerli bir tutar giriniz!");
 
             try {
@@ -419,7 +420,7 @@
                 await updateDoc(musteriRef, { bakiye: yeniBakiye });
                 
                 document.getElementById("islemMiktari").value = "";
-                document.getElementById("islemAciklama").value = ""; 
+                document.getElementById("islemAciklama").value = ""; // GÜNCELLENDİ: Seçimi sıfırlar
                 document.getElementById("musteriAramaIslem").value = "";
                 document.getElementById("secilenMusteriId").value = "";
                 
