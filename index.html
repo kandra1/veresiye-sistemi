@@ -22,9 +22,9 @@
         .sayfa-kutu { font-size: 12px; color: #666; }
         .bakiye-kutu { font-weight: 800; font-size: 16px; padding: 5px 10px; border-radius: 5px; }
         
-        /* Alt Menü */
+        /* Alt Menü (4 Butona Göre Güncellendi) */
         .alt-menu { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; border-top: 1px solid #ddd; z-index: 100; }
-        .alt-menu button { flex: 1; padding: 15px; border: none; background: none; font-weight: bold; color: #555; border-radius: 0; }
+        .alt-menu button { flex: 1; padding: 12px 2px; border: none; background: none; font-weight: bold; color: #555; border-radius: 0; font-size: 13px; }
         .alt-menu button.aktif { color: #28a745; background: #e8f5e9; border-top: 3px solid #28a745; }
 
         .ust-bilgi { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -118,6 +118,21 @@
             </div>
         </div>
 
+        <div id="ekranGecikenler" style="display: none;">
+            <div class="kutu">
+                <h3>⏳ Gecikmiş Borçlar</h3>
+                <p style="font-size: 13px; color: #666;">Ne zamandır ödeme/işlem yapmayanları görmek istiyorsun?</p>
+                <select id="gecikmeSuresi" onchange="gecikmisleriListele()">
+                    <option value="1">1 Aydır İşlem Yapmayanlar</option>
+                    <option value="2">2 Aydır İşlem Yapmayanlar</option>
+                    <option value="3">3 Aydır İşlem Yapmayanlar</option>
+                    <option value="6">6 Aydır İşlem Yapmayanlar</option>
+                    <option value="12">1 Yıldır İşlem Yapmayanlar</option>
+                </select>
+                <div id="gecikenlerListesi" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+
         <div id="ekranDetay" style="display: none;">
             <button class="btn-gri" onclick="sekmeDegistir('arama')">⬅️ Kişilere Geri Dön</button>
             <div class="kutu" style="margin-top: 15px; background: #e8f5e9; border: 1px solid #c8e6c9;">
@@ -134,8 +149,9 @@
 
         <div class="alt-menu">
             <button id="btnArama" class="aktif" onclick="sekmeDegistir('arama')">🔍 Kişiler</button>
-            <button id="btnIslem" onclick="sekmeDegistir('islem')">💸 İşlem Yap</button>
-            <button id="btnEkleme" onclick="sekmeDegistir('ekleme')">➕ Yeni Ekle / Sil</button>
+            <button id="btnIslem" onclick="sekmeDegistir('islem')">💸 İşlem</button>
+            <button id="btnEkleme" onclick="sekmeDegistir('ekleme')">➕ Ekle/Sil</button>
+            <button id="btnGecikenler" onclick="sekmeDegistir('gecikenler')">⏳ Gecikenler</button>
         </div>
     </div>
 
@@ -144,16 +160,21 @@
             document.getElementById("ekranArama").style.display = sekme === 'arama' ? "block" : "none";
             document.getElementById("ekranIslem").style.display = sekme === 'islem' ? "block" : "none";
             document.getElementById("ekranEkleme").style.display = sekme === 'ekleme' ? "block" : "none";
+            document.getElementById("ekranGecikenler").style.display = sekme === 'gecikenler' ? "block" : "none";
             document.getElementById("ekranDetay").style.display = sekme === 'detay' ? "block" : "none";
             
             document.getElementById("btnArama").className = sekme === 'arama' ? "aktif" : "";
             document.getElementById("btnIslem").className = sekme === 'islem' ? "aktif" : "";
             document.getElementById("btnEkleme").className = sekme === 'ekleme' ? "aktif" : "";
+            document.getElementById("btnGecikenler").className = sekme === 'gecikenler' ? "aktif" : "";
 
             const oneriler = document.getElementById("islemMusteriOnerileri");
             if(oneriler) oneriler.style.display = "none";
             const silOneriler = document.getElementById("silMusteriOnerileri");
             if(silOneriler) silOneriler.style.display = "none";
+
+            // Eğer gecikenler sekmesine geçilirse listeyi otomatik güncelle
+            if (sekme === 'gecikenler') window.gecikmisleriListele();
         }
 
         window.canliArama = function() {
@@ -171,7 +192,7 @@
         import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, getDoc, query, where, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 
-        // BURAYI KENDİ BİLGİLERİNE GÖRE DOLDUR
+        // DİKKAT: BURAYA KENDİ FİREBASE BİLGİLERİNİ YAPIŞTIRMAYI UNUTMA!
         const firebaseConfig = {
   apiKey: "AIzaSyCezofCOBCKEVU3ip5HyUokaqcbRLFnq-g",
   authDomain: "veresiye-f8611.firebaseapp.com",
@@ -224,7 +245,14 @@
                     const bakiye = data.bakiye || 0;
                     const renk = bakiye > 0 ? "color: #dc3545;" : "color: #28a745;";
                     
-                    tumMusteriler.push({ id: docSnap.id, isim: data.isim, sayfa: data.sayfa });
+                    // Son işlem tarihini de diziye alıyoruz
+                    tumMusteriler.push({ 
+                        id: docSnap.id, 
+                        isim: data.isim, 
+                        sayfa: data.sayfa, 
+                        bakiye: bakiye,
+                        sonIslemTarihi: data.sonIslemTarihi || null 
+                    });
 
                     liste.innerHTML += `
                     <div class="liste-kart musteri-satiri" onclick="musteriDetayAc('${docSnap.id}', '${data.isim}', ${bakiye}, '${data.sayfa}')">
@@ -288,6 +316,44 @@
                         </div>
                     </div>`;
                 });
+            });
+        }
+
+        // YENİ: Gecikmiş borçluları hesaplayıp listeleme fonksiyonu
+        window.gecikmisleriListele = function() {
+            const aySayisi = parseInt(document.getElementById("gecikmeSuresi").value);
+            const liste = document.getElementById("gecikenlerListesi");
+            liste.innerHTML = "";
+
+            const simdi = Date.now();
+            // 1 Ay = ~30 Gün olarak hesaplanır
+            const milisaniyeSiniri = aySayisi * 30 * 24 * 60 * 60 * 1000; 
+
+            const gecikenler = tumMusteriler.filter(m => {
+                // Borcu yoksa listeye alma
+                if (m.bakiye <= 0) return false; 
+                // Henüz hiç işlem tarihi yoksa (veya eski sistemden kalmaysa) şimdilik listeye alma
+                if (!m.sonIslemTarihi) return false; 
+                
+                const gecenSure = simdi - m.sonIslemTarihi;
+                return gecenSure >= milisaniyeSiniri;
+            });
+
+            if (gecikenler.length === 0) {
+                liste.innerHTML = `<p style='color: #28a745; text-align: center; font-weight: bold; padding: 20px; background: #e8f5e9; border-radius: 10px;'>🎉 Bu kritere uyan gecikmiş borçlu bulunmuyor!</p>`;
+                return;
+            }
+
+            gecikenler.forEach(m => {
+                const sonIslemTarihFormati = new Date(m.sonIslemTarihi).toLocaleDateString('tr-TR');
+                liste.innerHTML += `
+                <div class="liste-kart" onclick="musteriDetayAc('${m.id}', '${m.isim}', ${m.bakiye}, '${m.sayfa}')">
+                    <div>
+                        <div class="isim-kutu">${m.isim.toUpperCase()}</div>
+                        <div class="sayfa-kutu">Sayfa: ${m.sayfa} <br> <span style="color:#dc3545;">Son İşlem: ${sonIslemTarihFormati}</span></div>
+                    </div>
+                    <div class="bakiye-kutu" style="color: #dc3545; font-size: 18px;">${m.bakiye} ₺</div>
+                </div>`;
             });
         }
 
@@ -360,7 +426,13 @@
             const sayfa = document.getElementById("sayfaNo").value;
             if(ad === "" || sayfa === "") return alert("Lütfen boş alan bırakmayın!");
             try {
-                await addDoc(collection(db, "musteriler"), { isim: ad, sayfa: sayfa, bakiye: 0 });
+                // Eklenme tarihini de ilk işlem tarihi olarak kaydediyoruz ki gecikenler hesabı başlasın
+                await addDoc(collection(db, "musteriler"), { 
+                    isim: ad, 
+                    sayfa: sayfa, 
+                    bakiye: 0,
+                    sonIslemTarihi: Date.now() 
+                });
                 document.getElementById("musteriAd").value = "";
                 document.getElementById("sayfaNo").value = "";
                 sekmeDegistir('arama');
@@ -394,8 +466,8 @@
             if(!musteriId) return alert("Lütfen listeden aratarak bir müşteri seçin!");
             if(isNaN(miktar) || miktar <= 0) return alert("Geçerli bir tutar giriniz!");
 
-            // GÜNCELLENDİ: Eğer açıklama boşsa, işlem türüne göre otomatik isim atıyoruz
             const aciklama = aciklamaInput !== "" ? aciklamaInput : (islemTuru === 'borc' ? "BORÇ KAYDI" : "ÖDEME");
+            const islemAni = Date.now(); // İşlemin yapıldığı an
 
             try {
                 const musteriRef = doc(db, "musteriler", musteriId);
@@ -416,10 +488,14 @@
                     eskiBakiye: eskiBakiye,
                     yeniBakiye: yeniBakiye,
                     kullanici: aktifKullanici,
-                    tarih: Date.now()
+                    tarih: islemAni
                 });
 
-                await updateDoc(musteriRef, { bakiye: yeniBakiye });
+                // Müşterinin bakiyesiyle birlikte SON İŞLEM TARİHİ de güncelleniyor
+                await updateDoc(musteriRef, { 
+                    bakiye: yeniBakiye,
+                    sonIslemTarihi: islemAni 
+                });
                 
                 document.getElementById("islemMiktari").value = "";
                 document.getElementById("islemAciklama").value = ""; 
