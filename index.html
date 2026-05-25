@@ -74,18 +74,18 @@
                 </div>
                 <input type="hidden" id="secilenMusteriId">
                 
-                <select id="islemAciklama">
-                    <option value="" disabled selected>Ürün veya Ödeme Türü Seçin</option>
-                    <option value="iban">İBAN</option>
-                    <option value="euro">EURO</option>
-                    <option value="dolar">DOLAR</option>
-                    <option value="sterlin">STERLİN</option>
-                    <option value="pike">PİKE</option>
-                    <option value="yatak örtüsü">YATAK ÖRTÜSÜ</option>
-                    <option value="kanepe örtüsü">KANAPE ÖRTÜSÜ</option>
-                    <option value="perde">PERDE</option>
-                    <option value="nevresim">NEVRESİM</option>
-                </select>
+                <input type="text" id="islemAciklama" list="hazirKelimeler" placeholder="Ne aldı? / Ödeme türü (Boş bırakılabilir)" autocomplete="off">
+                <datalist id="hazirKelimeler">
+                    <option value="İBAN">
+                    <option value="EURO">
+                    <option value="DOLAR">
+                    <option value="STERLİN">
+                    <option value="PİKE">
+                    <option value="YATAK ÖRTÜSÜ">
+                    <option value="KANAPE ÖRTÜSÜ">
+                    <option value="PERDE">
+                    <option value="NEVRESİM">
+                </datalist>
                 
                 <input type="number" id="islemMiktari" placeholder="Tutar (TL)">
                 
@@ -173,13 +173,12 @@
 
         // BURAYI KENDİ BİLGİLERİNE GÖRE DOLDUR
         const firebaseConfig = {
-  apiKey: "AIzaSyCezofCOBCKEVU3ip5HyUokaqcbRLFnq-g",
-  authDomain: "veresiye-f8611.firebaseapp.com",
-  projectId: "veresiye-f8611",
-  storageBucket: "veresiye-f8611.firebasestorage.app",
-  messagingSenderId: "514357633675",
-  appId: "1:514357633675:web:75678bd2547582426f2a8e",
-  measurementId: "G-C3F473YDT2"
+            apiKey: "SENIN_API_ANAHTARIN",
+            authDomain: "proje-adin.firebaseapp.com",
+            projectId: "proje-adin",
+            storageBucket: "proje-adin.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -389,11 +388,13 @@
             const musteriId = document.getElementById("secilenMusteriId").value;
             const miktar = parseFloat(document.getElementById("islemMiktari").value);
             const musteriIsim = document.getElementById("musteriAramaIslem").value;
-            const aciklama = document.getElementById("islemAciklama").value; // GÜNCELLENDİ: Seçilen hazır kelimeyi alır
+            const aciklamaInput = document.getElementById("islemAciklama").value.trim(); 
 
             if(!musteriId) return alert("Lütfen listeden aratarak bir müşteri seçin!");
-            if(!aciklama) return alert("Lütfen listeden bir ürün veya ödeme türü seçin!"); // GÜNCELLENDİ: Boş geçilmesini engeller
             if(isNaN(miktar) || miktar <= 0) return alert("Geçerli bir tutar giriniz!");
+
+            // GÜNCELLENDİ: Eğer açıklama boşsa, işlem türüne göre otomatik isim atıyoruz
+            const aciklama = aciklamaInput !== "" ? aciklamaInput : (islemTuru === 'borc' ? "BORÇ KAYDI" : "ÖDEME");
 
             try {
                 const musteriRef = doc(db, "musteriler", musteriId);
@@ -420,7 +421,7 @@
                 await updateDoc(musteriRef, { bakiye: yeniBakiye });
                 
                 document.getElementById("islemMiktari").value = "";
-                document.getElementById("islemAciklama").value = ""; // GÜNCELLENDİ: Seçimi sıfırlar
+                document.getElementById("islemAciklama").value = ""; 
                 document.getElementById("musteriAramaIslem").value = "";
                 document.getElementById("secilenMusteriId").value = "";
                 
