@@ -15,7 +15,7 @@
         .btn-mavi { background-color: #007bff; }
         .btn-gri { background-color: #6c757d; }
         
-        /* Liste tasarımı (Tıklanabilir yapıldı) */
+        /* Liste tasarımı */
         .liste-kart { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 12px 0; cursor: pointer; transition: background 0.2s; }
         .liste-kart:hover { background-color: #f1f3f5; }
         .isim-kutu { font-weight: bold; color: #333; }
@@ -91,6 +91,19 @@
                 <input type="number" id="sayfaNo" placeholder="Defterdeki Sayfa Numarası">
                 <button class="btn-yesil" onclick="musteriEkle()">Müşteriyi Kaydet</button>
             </div>
+
+            <div class="kutu" style="border-top: 3px solid #dc3545; margin-top: 25px;">
+                <h3 style="color: #dc3545;">🗑️ Müşteri Sil</h3>
+                <p style="font-size: 13px; color: #666; margin: 0 0 10px 0;">Defterden tamamen kaldırmak istediğiniz müşteriyi seçin.</p>
+                
+                <div style="position: relative; margin-bottom: 8px;">
+                    <input type="text" id="silMusteriArama" oninput="silMusteriAra()" placeholder="🔍 Silinecek isim veya sayfa no yazın..." autocomplete="off">
+                    <ul id="silMusteriOnerileri" class="oneriler-listesi" style="display: none;"></ul>
+                </div>
+                <input type="hidden" id="secilenSilMusteriId">
+                
+                <button class="btn-kirmizi" onclick="musteriSil()">Müşteriyi Tamamen Sil</button>
+            </div>
         </div>
 
         <div id="ekranDetay" style="display: none;">
@@ -110,7 +123,7 @@
         <div class="alt-menu">
             <button id="btnArama" class="aktif" onclick="sekmeDegistir('arama')">🔍 Kişiler</button>
             <button id="btnIslem" onclick="sekmeDegistir('islem')">💸 İşlem Yap</button>
-            <button id="btnEkleme" onclick="sekmeDegistir('ekleme')">➕ Yeni Ekle</button>
+            <button id="btnEkleme" onclick="sekmeDegistir('ekleme')">➕ Yeni Ekle / Sil</button>
         </div>
     </div>
 
@@ -125,8 +138,11 @@
             document.getElementById("btnIslem").className = sekme === 'islem' ? "aktif" : "";
             document.getElementById("btnEkleme").className = sekme === 'ekleme' ? "aktif" : "";
 
+            // Öneri kutularını kapat
             const oneriler = document.getElementById("islemMusteriOnerileri");
             if(oneriler) oneriler.style.display = "none";
+            const silOneriler = document.getElementById("silMusteriOnerileri");
+            if(silOneriler) silOneriler.style.display = "none";
         }
 
         window.canliArama = function() {
@@ -141,7 +157,8 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, getDoc, query, where } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+        // YENİ: deleteDoc veritabanından silme fonksiyonu eklendi
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, getDoc, query, where, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 
         // BURAYI KENDİ BİLGİLERİNE GÖRE DOLDUR
@@ -296,6 +313,39 @@
             onerilerKutusu.style.display = "block";
         }
 
+        // YENİ: Silinecek müşteriyi arama fonksiyonu
+        window.silMusteriAra = function() {
+            const aranan = document.getElementById("silMusteriArama").value.toLowerCase();
+            const onerilerKutusu = document.getElementById("silMusteriOnerileri");
+            onerilerKutusu.innerHTML = "";
+
+            if (aranan.trim() === "") {
+                onerilerKutusu.style.display = "none";
+                document.getElementById("secilenSilMusteriId").value = "";
+                return;
+            }
+
+            const filtrelenmis = tumMusteriler.filter(m => m.isim.toLowerCase().includes(aranan) || m.sayfa.toString().includes(aranan));
+
+            if (filtrelenmis.length === 0) {
+                onerilerKutusu.innerHTML = `<li style="color: #999; cursor: default;">Kişi bulunamadı</li>`;
+                onerilerKutusu.style.display = "block";
+                return;
+            }
+
+            filtrelenmis.forEach(m => {
+                const li = document.createElement("li");
+                li.innerText = `${m.isim.toUpperCase()} (Sayfa: ${m.sayfa})`;
+                li.onclick = function() {
+                    document.getElementById("silMusteriArama").value = m.isim.toUpperCase();
+                    document.getElementById("secilenSilMusteriId").value = m.id;
+                    onerilerKutusu.style.display = "none";
+                };
+                onerilerKutusu.appendChild(li);
+            });
+            onerilerKutusu.style.display = "block";
+        }
+
         window.musteriEkle = async function() {
             const ad = document.getElementById("musteriAd").value.toLowerCase();
             const sayfa = document.getElementById("sayfaNo").value;
@@ -306,6 +356,33 @@
                 document.getElementById("sayfaNo").value = "";
                 sekmeDegistir('arama');
             } catch (error) { alert("Hata: " + error.message); }
+        }
+
+        // YENİ: Müşteriyi Tamamen Silme Fonksiyonu
+        window.musteriSil = async function() {
+            const id = document.getElementById("secilenSilMusteriId").value;
+            const isim = document.getElementById("silMusteriArama").value;
+
+            if(!id) return alert("Lütfen silmek istediğiniz müşteriyi listeden aratarak seçin!");
+
+            // Esnaf dostu çift onay mekanizması
+            const onay = confirm(`⚠️ DİKKAT: "${isim}" isimli müşteriyi defterden tamamen silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz!`);
+            
+            if(!onay) return;
+
+            try {
+                // Firestore'dan dokümanı kaldır
+                await deleteDoc(doc(db, "musteriler", id));
+                
+                // Form alanlarını sıfırla
+                document.getElementById("silMusteriArama").value = "";
+                document.getElementById("secilenSilMusteriId").value = "";
+                
+                alert("Müşteri hesabı defterden başarıyla silindi.");
+                sekmeDegistir('arama'); // Ana listeye at
+            } catch (error) { 
+                alert("Silme işlemi sırasında hata oluştu: " + error.message); 
+            }
         }
 
         window.islemYap = async function(islemTuru) {
@@ -319,7 +396,6 @@
 
             try {
                 const musteriRef = doc(db, "musteriler", musteriId);
-                // DÜZELTİLEN KISIM BURASI (musterRef -> musteriRef)
                 const musteriSnap = await getDoc(musteriRef);
                 
                 if (!musteriSnap.exists()) return alert("Müşteri bulunamadı!");
